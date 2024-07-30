@@ -22,6 +22,7 @@ This repository contains Ansible playbooks and configurations for deploying the 
    git clone https://github.com/yourusername/ansible-hng-boilerplate-deployment.git
    cd ansible-hng-boilerplate-deployment
 
+   ```
 2. **Prepare your inventory file**
 
 Create an inventory.cfg file with the following structure:
@@ -31,6 +32,20 @@ your_server_ip ansible_user=ubuntu ansible_ssh_private_key_file=/path/to/your/pr
 
 Replace your_server_ip with the IP address of your server and /path/to/your/private_key.pem with the path to your SSH private key.
 
-3. Run the Ansible Playbook
-ansible-playbook main.yaml -b -i inventory.cfg
+3. Create ansible.cfg file with the following structure
 
+[defaults]
+
+allow_world_readable_tmpfiles = True
+
+[ssh_connection]
+
+pipelining = True
+
+4. Run the Ansible Playbook
+   ansible-playbook main.yaml -b -i inventory.cfg
+
+
+![1722367396720](image/README/1722367396720.png)
+
+![1722367425173](image/README/1722367425173.png)
