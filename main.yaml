@@ -12,6 +12,8 @@
     nginx_conf_file: "/etc/nginx/sites-available/stage_5b"
     nginx_conf_link: "/etc/nginx/sites-enabled/stage_5b"
     log_directory: "/var/log/stage_5b"
+    service_name: "fastapi-app"
+    service_file: "/etc/systemd/system/fastapi-app.service"
 
   tasks:
     - name: Create hng user
@@ -118,25 +120,55 @@
         group: hng
         mode: '0755'
 
-    - name: Configure and run the application
-      block:
-        - name: Export environment variables
-          lineinfile:
-            path: "{{ app_directory }}/.env"
-            create: yes
-            line: "{{ item }}"
-          loop:
-            - "DATABASE_URL=postgresql://{{ pg_user }}:{{ pg_password }}@localhost:5432/{{ pg_database }}"
-            - "REDIS_URL=redis://localhost:6379/0"
+    - name: Create application log files
+      file:
+        path: "{{ item }}"
+        state: touch
+        owner: hng
+        group: hng
+        mode: '0644'
+      loop:
+        - "{{ log_directory }}/error.log"
+        - "{{ log_directory }}/out.log"
 
-        - name: Run the application
-          shell: |
-            source {{ app_directory }}/venv/bin/activate
-            uvicorn app.main:app --host 127.0.0.1 --port 3000 &
-          args:
-            chdir: "{{ app_directory }}"
-          become: yes
-          become_user: hng
+    - name: Export environment variables
+      lineinfile:
+        path: "{{ app_directory }}/.env"
+        create: yes
+        line: "{{ item }}"
+      loop:
+        - "DATABASE_URL=postgresql://{{ pg_user }}:{{ pg_password }}@localhost:5432/{{ pg_database }}"
+        - "REDIS_URL=redis://localhost:6379/0"
+
+    - name: Create systemd service file for FastAPI app
+      copy:
+        dest: "{{ service_file }}"
+        content: |
+          [Unit]
+          Description=FastAPI application
+          After=network.target
+
+          [Service]
+          User=hng
+          Group=hng
+          WorkingDirectory={{ app_directory }}
+          EnvironmentFile={{ app_directory }}/.env
+          ExecStart={{ app_directory }}/venv/bin/uvicorn main:app --host 127.0.0.1 --port 3000
+          Restart=always
+          StandardOutput=file:{{ log_directory }}/out.log
+          StandardError=file:{{ log_directory }}/error.log
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd to apply changes
+      command: systemctl daemon-reload
+
+    - name: Enable and start FastAPI service
+      systemd:
+        name: "{{ service_name }}"
+        enabled: yes
+        state: started
 
     - name: Configure Nginx
       block:
